@@ -1,26 +1,3 @@
-Vamos revisar o README em relação ao que é pedido no PDF. Vou verificar cada item mencionado no desafio e ajustá-lo, se necessário, para garantir que o documento atenda exatamente aos requisitos.
-
----
-
-### **Passo 1: Analisar os Requisitos do PDF**
-Deixe-me verificar no PDF quais informações específicas são solicitadas para o `README.md`. Vou confirmar os elementos necessários e garantir que eles estejam alinhados.
-
-**Por favor, aguarde enquanto faço essa revisão...**
-
-Com base nos requisitos do PDF, o README atual precisa incluir seções específicas solicitadas:
-
-### **Requisitos Específicos do README**
-Conforme o PDF, o `README.md` deve conter:
-1. **Steps to set up and run the simulated environment locally.**
-2. **How to test the static website and API functionality.**
-3. **Any assumptions or decisions made during implementation.**
-
-Vamos atualizar o `README.md` para garantir que ele atenda plenamente a esses critérios.
-
----
-
-### **Atualização do README.md**
-
 ```markdown
 # **Challenge-SAM: LIDP Cloud Challenge**
 
