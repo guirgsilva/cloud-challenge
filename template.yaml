@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: LIDP Cloud Challenge - Serverless Application
+
+Resources:
+  # Lambda Function for /greet
+  GreetFunction:
+   Type: AWS::Serverless::Function
+   Properties:
+     Handler: src/handlers/greet.handler
+     Runtime: nodejs18.x
+     CodeUri: .
+     Description: Lambda function for the /greet endpoint
+     Events:
+       GreetApi:
+         Type: Api
+         Properties:
+           Path: /greet
+           Method: GET
+
+
+  # DynamoDB Table for API Logs
+  APILogsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      TableName: APILogs
+
+  # S3 Bucket for Static Website Hosting
+  StaticWebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+
+  # Bucket Policy for S3 Bucket
+  StaticWebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticWebsiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub "arn:aws:s3:::${StaticWebsiteBucket}"
+              - !Sub "arn:aws:s3:::${StaticWebsiteBucket}/*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": false
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${GreetFunction}.execute-api.${AWS::Region}.amazonaws.com/Prod/greet"
+
+  LogsTableName:
+    Description: Nome da tabela DynamoDB usada para logs
+    Value: !Ref APILogsTable
