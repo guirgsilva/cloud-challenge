@@ -24,7 +24,7 @@ A production-ready serverless application showcasing cloud infrastructure skills
 ```bash
 # Clone the repository
 git clone https://github.com/guirgsilva/cloud-challenge
-cd challenge-SAM
+cd cloud-challenge
 
 # Install dependencies
 npm install
