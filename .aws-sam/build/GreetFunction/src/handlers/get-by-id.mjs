@@ -1,47 +1,87 @@
-// Create clients and set shared const values outside of the handler.
-
-// Create a DocumentClient that represents the query to add an item
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
-const client = new DynamoDBClient({});
+import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
+
+const getDynamoDBConfig = () => {
+    if (process.env.AWS_SAM_LOCAL === 'true') {
+        return {
+            endpoint: 'http://dynamodb:8000',
+            region: 'local',
+            credentials: {
+                accessKeyId: 'dummy',
+                secretAccessKey: 'dummy'
+            },
+            forcePathStyle: true
+        };
+    }
+    return {
+        region: process.env.AWS_REGION
+    };
+};
+
+const client = new DynamoDBClient(getDynamoDBConfig());
 const ddbDocClient = DynamoDBDocumentClient.from(client);
 
-// Get the DynamoDB table name from environment variables
-const tableName = process.env.SAMPLE_TABLE;
-
-/**
- * A simple example includes a HTTP get method to get one item by id from a DynamoDB table.
- */
 export const getByIdHandler = async (event) => {
-  if (event.httpMethod !== 'GET') {
-    throw new Error(`getMethod only accept GET method, you tried: ${event.httpMethod}`);
-  }
-  // All log statements are written to CloudWatch
-  console.info('received:', event);
- 
-  // Get id from pathParameters from APIGateway because of `/{id}` at template.yaml
-  const id = event.pathParameters.id;
- 
-  // Get the item from the table
-  // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#get-property
-  var params = {
-    TableName : tableName,
-    Key: { id: id },
-  };
+    if (event.httpMethod !== 'GET') {
+        throw new Error(`getMethod only accept GET method, you tried: ${event.httpMethod}`);
+    }
 
-  try {
-    const data = await ddbDocClient.send(new GetCommand(params));
-    var item = data.Item;
-  } catch (err) {
-    console.log("Error", err);
-  }
- 
-  const response = {
-    statusCode: 200,
-    body: JSON.stringify(item)
-  };
- 
-  // All log statements are written to CloudWatch
-  console.info(`response from: ${event.path} statusCode: ${response.statusCode} body: ${response.body}`);
-  return response;
-}
+    const id = event.pathParameters.id;
+    console.info('Getting item with id:', id);
+
+    try {
+        const params = {
+            TableName: 'APILogs',
+            KeyConditionExpression: 'id = :id',
+            ExpressionAttributeValues: {
+                ':id': id
+            }
+        };
+
+        const data = await ddbDocClient.send(new QueryCommand(params));
+        console.log('Query result:', JSON.stringify(data, null, 2));
+
+        if (!data.Items || data.Items.length === 0) {
+            return {
+                statusCode: 404,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                body: JSON.stringify({
+                    message: `Item with id ${id} not found`
+                })
+            };
+        }
+
+        return {
+            statusCode: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify(data.Items[0])
+        };
+    } catch (err) {
+        console.error('Error:', {
+            message: err.message,
+            code: err.code,
+            statusCode: err.$metadata?.httpStatusCode,
+            stack: err.stack
+        });
+
+        return {
+            statusCode: 500,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({
+                message: 'Error retrieving item',
+                error: err.message,
+                id: id,
+                config: getDynamoDBConfig()
+            })
+        };
+    }
+};

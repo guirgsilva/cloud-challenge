@@ -1,44 +1,93 @@
-// Create clients and set shared const values outside of the handler.
-
-// Create a DocumentClient that represents the query to add an item
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
-const client = new DynamoDBClient({});
+
+const getDynamoDBConfig = () => {
+    if (process.env.AWS_SAM_LOCAL === 'true') {
+        return {
+            endpoint: 'http://dynamodb:8000',
+            region: 'local',
+            credentials: {
+                accessKeyId: 'dummy',
+                secretAccessKey: 'dummy'
+            },
+            forcePathStyle: true, // Needed for local DynamoDB
+        };
+    }
+    return {
+        region: process.env.AWS_REGION
+    };
+};
+
+const client = new DynamoDBClient(getDynamoDBConfig());
 const ddbDocClient = DynamoDBDocumentClient.from(client);
 
-// Get the DynamoDB table name from environment variables
-const tableName = process.env.SAMPLE_TABLE;
+const verifyTableExists = async (tableName) => {
+    try {
+        const { TableNames } = await client.send(new ListTablesCommand({}));
+        console.log('Available tables:', TableNames);
+        return TableNames.includes(tableName);
+    } catch (err) {
+        console.error('Error checking tables:', err);
+        return false;
+    }
+};
 
-/**
- * A simple example includes a HTTP get method to get all items from a DynamoDB table.
- */
 export const getAllItemsHandler = async (event) => {
     if (event.httpMethod !== 'GET') {
         throw new Error(`getAllItems only accept GET method, you tried: ${event.httpMethod}`);
     }
-    // All log statements are written to CloudWatch
-    console.info('received:', event);
-
-    // get all items from the table (only first 1MB data, you can use `LastEvaluatedKey` to get the rest of data)
-    // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#scan-property
-    // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Scan.html
-    var params = {
-        TableName : tableName
-    };
+    
+    console.info('DynamoDB Config:', getDynamoDBConfig());
 
     try {
-        const data = await ddbDocClient.send(new ScanCommand(params));
-        var items = data.Items;
+        // First verify if table exists
+        const tableExists = await verifyTableExists('APILogs');
+        if (!tableExists) {
+            throw new Error('APILogs table does not exist');
+        }
+
+        // Then attempt to scan
+        console.log("Attempting to scan table: APILogs");
+        const data = await ddbDocClient.send(new ScanCommand({
+            TableName: 'APILogs',
+            ConsistentRead: true
+        }));
+        
+        console.log("Success - items retrieved:", JSON.stringify(data, null, 2));
+        
+        return {
+            statusCode: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify(data.Items || [])
+        };
     } catch (err) {
-        console.log("Error", err);
+        console.error("Error details:", {
+            message: err.message,
+            code: err.code,
+            statusCode: err.$metadata?.httpStatusCode,
+            endpoint: client.config.endpoint,
+            stack: err.stack
+        });
+
+        return {
+            statusCode: 500,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({ 
+                message: 'Error retrieving items',
+                error: err.message,
+                config: getDynamoDBConfig(),
+                networkInfo: {
+                    isLocal: process.env.AWS_SAM_LOCAL === 'true',
+                    dockerNetwork: 'sam-network',
+                    tables: await verifyTableExists('APILogs')
+                }
+            })
+        };
     }
-
-    const response = {
-        statusCode: 200,
-        body: JSON.stringify(items)
-    };
-
-    // All log statements are written to CloudWatch
-    console.info(`response from: ${event.path} statusCode: ${response.statusCode} body: ${response.body}`);
-    return response;
-}
+};
