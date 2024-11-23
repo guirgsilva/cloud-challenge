@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # LIDP Cloud Challenge
 
 [![AWS SAM](https://img.shields.io/badge/AWS%20SAM-Ready-orange)](https://aws.amazon.com/serverless/sam/)
@@ -25,6 +26,49 @@ cd lidp-cloud-challenge
 ```
 
 2. **Install dependencies**
+=======
+```markdown
+# **Challenge-SAM: LIDP Cloud Challenge**
+
+## **Project Description**
+This repository contains the solution for the LIDP Cloud Challenge. The project simulates a serverless architecture using AWS SAM, including:
+- A static website hosted locally, simulating an S3 bucket.
+- A RESTful API backed by a Lambda function.
+- Logging of API calls into a DynamoDB table.
+
+---
+
+## **Features**
+
+### **API Endpoints**
+- **GET /greet**:  
+  - Responds with a JSON object containing a greeting message.
+  - Logs details (IP, user-agent, timestamp, etc.) of each request into DynamoDB.
+
+### **Static Website**
+- A simple "Hello, World!" page accessible via a local endpoint, simulating S3 hosting.
+
+### **AWS Resources**
+- **AWS Lambda**: 
+  - Handles API requests and logs the details to DynamoDB.
+- **Amazon API Gateway**: 
+  - Routes requests to the Lambda function.
+- **Amazon DynamoDB**:
+  - Stores logs in a table named `APILogs`.
+
+---
+
+## **Setup and Run Locally**
+
+### **1. Prerequisites**
+- **AWS CLI**: Installed and configured.
+- **Docker**: For running DynamoDB Local and SAM CLI.
+- **SAM CLI**: The latest version installed.
+- **Node.js**: Version 18 or higher.
+
+### **2. Install Dependencies**
+Run the following command to install the Node.js dependencies:
+>>>>>>> 49afe1d76dd07694fbb9024bfb41d7a54f751a1d
 ```bash
 npm install
 ```
@@ -125,6 +169,7 @@ The application consists of:
 └── package.json           # Node.js dependencies
 ```
 
+<<<<<<< HEAD
 ## 🔧 Common Issues & Solutions
 
 ### DynamoDB Connection Issues
@@ -171,3 +216,6 @@ sam local start-api --debug
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+=======
+---
+>>>>>>> 49afe1d76dd07694fbb9024bfb41d7a54f751a1d
