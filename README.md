@@ -23,7 +23,7 @@ A production-ready serverless application showcasing cloud infrastructure skills
 
 ```bash
 # Clone the repository
-git clone <[your-repository](https://github.com/guirgsilva/cloud-challenge)>
+git clone https://github.com/guirgsilva/cloud-challenge
 cd challenge-SAM
 
 # Install dependencies
