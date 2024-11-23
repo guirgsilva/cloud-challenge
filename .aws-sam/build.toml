@@ -5,8 +5,8 @@ codeuri = "/home/guirgsilva/LIDP/challenge-SAM/challenge-SAM"
 runtime = "nodejs18.x"
 architecture = "x86_64"
 handler = "src/handlers/greet.mjs"
-manifest_hash = "ec4f20335c21d30e7085988377ff117f"
+manifest_hash = "97deee483a28fdb6424b3dac2393b9a0"
 packagetype = "Zip"
-functions = ["GreetFunction"]
+functions = ["GetAllItemsFunction", "GetByIdFunction", "PutItemFunction", "GreetFunction", "StaticWebsiteFunction"]
 
 [layer_build_definitions]

@@ -1,6 +1,86 @@
-<html>
-  <body>
-    <h1>Hello, World!</h1>
-    <p>Welcome to the LIDP Cloud Challenge</p>
-  </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello, World! - LIDP Cloud Challenge</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 90%;
+        }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 1rem;
+        }
+        p {
+            color: #5f6368;
+            line-height: 1.5;
+        }
+        .api-test {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        #response {
+            margin-top: 1rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hello, World!</h1>
+        <p>Welcome to the LIDP Cloud Challenge static website. This page is hosted using AWS SAM local development environment.</p>
+        
+        <div class="api-test">
+            <h2>Test API Endpoint</h2>
+            <p>Click the button below to test the /greet endpoint:</p>
+            <button onclick="testGreetEndpoint()">Test Greeting API</button>
+            <div id="response"></div>
+        </div>
+    </div>
+
+    <script>
+        async function testGreetEndpoint() {
+            const responseElement = document.getElementById('response');
+            try {
+                const response = await fetch('/greet');
+                const data = await response.json();
+                responseElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseElement.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
 </html>

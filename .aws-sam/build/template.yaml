@@ -1,7 +1,81 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: LIDP Cloud Challenge - Serverless Application
+Globals:
+  Api:
+    EndpointConfiguration:
+      Type: REGIONAL
+    Auth:
+      DefaultAuthorizer: NONE
+    Cors:
+      AllowMethods: '''GET,POST,OPTIONS'''
+      AllowHeaders: '''Content-Type,Authorization'''
+      AllowOrigin: '''*'''
+    Domain:
+      SecurityPolicy: TLS_1_2
+  Function:
+    Tracing: Active
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
 Resources:
+  GetAllItemsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/get-all-items.getAllItemsHandler
+      Runtime: nodejs18.x
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: APILogsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /items
+            Method: GET
+      CodeUri: GetAllItemsFunction
+    DependsOn: APILogsTable
+    Metadata:
+      SamResourceId: GetAllItemsFunction
+  GetByIdFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/get-by-id.getByIdHandler
+      Runtime: nodejs18.x
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: APILogsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /items/{id}
+            Method: GET
+      CodeUri: GetByIdFunction
+    DependsOn: APILogsTable
+    Metadata:
+      SamResourceId: GetByIdFunction
+  PutItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/put-item.putItemHandler
+      Runtime: nodejs18.x
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: APILogsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /items
+            Method: POST
+      CodeUri: PutItemFunction
+    DependsOn: APILogsTable
+    Metadata:
+      SamResourceId: PutItemFunction
   GreetFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -9,31 +83,91 @@ Resources:
       Runtime: nodejs18.x
       CodeUri: GreetFunction
       Description: Lambda function for the /greet endpoint
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: APILogsTable
       Events:
         GreetApi:
           Type: Api
           Properties:
             Path: /greet
             Method: GET
+    DependsOn: APILogsTable
     Metadata:
       SamResourceId: GreetFunction
+  StaticWebsiteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/static.handler
+      Runtime: nodejs18.x
+      CodeUri: StaticWebsiteFunction
+      Description: Lambda function for serving static content
+      Events:
+        StaticWeb:
+          Type: Api
+          Properties:
+            Path: /
+            Method: GET
+    Metadata:
+      SamResourceId: StaticWebsiteFunction
   APILogsTable:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
       - AttributeName: id
         AttributeType: S
+      - AttributeName: timestamp
+        AttributeType: S
       KeySchema:
       - AttributeName: id
         KeyType: HASH
+      - AttributeName: timestamp
+        KeyType: RANGE
       BillingMode: PAY_PER_REQUEST
       TableName: APILogs
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
   StaticWebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: error.html
+      OwnershipControls:
+        Rules:
+        - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LoggingConfiguration:
+        DestinationBucketName:
+          Ref: AccessLogsBucket
+        LogFilePrefix: static-website-logs/
+  AccessLogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
   StaticWebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -42,21 +176,126 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Effect: Deny
-          Principal: '*'
-          Action: s3:*
+        - Sid: PublicReadGetObject
+          Effect: Allow
+          Principal:
+            Service: apigateway.amazonaws.com
+          Action:
+          - s3:GetObject
           Resource:
-          - Fn::Sub: arn:aws:s3:::${StaticWebsiteBucket}
-          - Fn::Sub: arn:aws:s3:::${StaticWebsiteBucket}/*
-          Condition:
-            Bool:
-              aws:SecureTransport: false
+            Fn::Sub: ${StaticWebsiteBucket.Arn}/*
+  ApiGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/apigateway/${AWS::StackName}
+      RetentionInDays: 7
+  GreetFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${GreetFunction}
+      RetentionInDays: 7
+  WebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name:
+        Fn::Sub: ${AWS::StackName}-web-acl
+      Description: WAF rules for API Gateway
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      Rules:
+      - Name: RateLimit
+        Priority: 1
+        Statement:
+          RateBasedStatement:
+            Limit: 2000
+            AggregateKeyType: IP
+        Action:
+          Block: {}
+        VisibilityConfig:
+          SampledRequestsEnabled: true
+          CloudWatchMetricsEnabled: true
+          MetricName: RateLimitRule
+      - Name: BlockSQLInjection
+        Priority: 2
+        Statement:
+          SqliMatchStatement:
+            FieldToMatch:
+              QueryString: {}
+            TextTransformations:
+            - Type: URL_DECODE
+              Priority: 1
+        Action:
+          Block: {}
+        VisibilityConfig:
+          SampledRequestsEnabled: true
+          CloudWatchMetricsEnabled: true
+          MetricName: BlockSQLInjectionRule
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+        - DomainName:
+            Fn::Sub: ${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com
+          Id: APIGateway
+          OriginPath: /Prod
+          CustomOriginConfig:
+            HTTPSPort: 443
+            OriginProtocolPolicy: https-only
+            OriginSSLProtocols:
+            - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: APIGateway
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        Logging:
+          Bucket:
+            Fn::GetAtt:
+            - AccessLogsBucket
+            - DomainName
+          Prefix: cloudfront-logs/
+        WebACLId:
+          Fn::GetAtt:
+          - WebACL
+          - Arn
 Outputs:
   ApiEndpoint:
-    Description: API Gateway endpoint URL
+    Description: API Gateway endpoint URL for /greet
     Value:
-      Fn::Sub: https://${GreetFunction}.execute-api.${AWS::Region}.amazonaws.com/Prod/greet
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/greet
+  WebsiteUrl:
+    Description: Static Website URL
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/
+  CloudFrontDomain:
+    Description: CloudFront Distribution Domain Name
+    Value:
+      Fn::GetAtt:
+      - CloudFrontDistribution
+      - DomainName
+  WebACLArn:
+    Description: ARN of the WAF Web ACL
+    Value:
+      Fn::GetAtt:
+      - WebACL
+      - Arn
   LogsTableName:
-    Description: Nome da tabela DynamoDB usada para logs
+    Description: Name of the DynamoDB table used for API logs
     Value:
       Ref: APILogsTable
+  LocalEndpoints:
+    Description: Local development endpoints
+    Value:
+      Fn::Sub: 'Static Website: http://localhost:3000
+
+        API Endpoint: http://localhost:3000/greet
+
+        DynamoDB Local: http://localhost:8000'
